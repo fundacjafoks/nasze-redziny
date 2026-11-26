@@ -1,0 +1,50 @@
+name: Aktualności
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  news:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pobierz aktualności
+        run: |
+          python3 - <<'EOF'
+          import json, re, html, urllib.request
+          import xml.etree.ElementTree as ET
+          from email.utils import parsedate_to_datetime
+          H = {"User-Agent": "Mozilla/5.0 (compatible; NaszeRedziny/1.0)"}
+          def get(u):
+              return urllib.request.urlopen(urllib.request.Request(u, headers=H), timeout=30).read()
+          def clean(t):
+              t = re.sub(r"<[^>]+>", " ", t or "")
+              return re.sub(r"\s+", " ", html.unescape(t)).strip()
+          items = []
+          try:
+              api = "https://redziny.pl/wp-json/wp/v2/posts?per_page=15&_fields=id,date,link,title,excerpt"
+              for p in json.loads(get(api)):
+                  items.append({"title": clean(p["title"]["rendered"]), "link": p["link"],
+                                "date": p["date"], "excerpt": clean(p["excerpt"]["rendered"])[:200]})
+          except Exception as e:
+              print("api:", e)
+          if not items:
+              try:
+                  for it in ET.fromstring(get("https://redziny.pl/feed/")).iter("item"):
+                      items.append({"title": clean(it.findtext("title")), "link": (it.findtext("link") or "").strip(),
+                                    "date": parsedate_to_datetime(it.findtext("pubDate")).isoformat(),
+                                    "excerpt": clean(it.findtext("description"))[:200]})
+              except Exception as e:
+                  print("rss:", e)
+          if not items:
+              raise SystemExit("brak danych z redziny.pl")
+          json.dump(items[:15], open("news.json", "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+          EOF
+      - name: Zapisz zmiany
+        run: |
+          git config user.name "news-bot"
+          git config user.email "news-bot@users.noreply.github.com"
+          git add news.json
+          git diff --staged --quiet || (git commit -m "Aktualizacja aktualności" && git push)
