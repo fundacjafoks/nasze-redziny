@@ -236,8 +236,8 @@ function renderNews(list,live){
 renderNews(NEWS.map(function(n){return{title:n[1],link:n[3],date:n[0]?n[0].split(".").reverse().join("-"):""}}),false);
 (function(){
  var c=new AbortController(),t=setTimeout(function(){c.abort()},8000);
- fetch(API,{signal:c.signal}).then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(d){
-  if(Array.isArray(d)&&d.length)renderNews(d.map(function(p){return{title:clean(p.title&&p.title.rendered),link:p.link,date:p.date,excerpt:clean(p.excerpt&&p.excerpt.rendered).slice(0,200)}}),true)}).catch(function(){}).then(function(){clearTimeout(t)});
+ fetch("news.json?"+Date.now(),{signal:c.signal}).then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(d){
+  if(Array.isArray(d)&&d.length)renderNews(d,true)}).catch(function(){}).then(function(){clearTimeout(t)});
 })();
 $("#grp").innerHTML=GRP.map(function(g,i){return'<option value="'+i+'">'+g[0]+'</option>'}).join("");
 function setPdf(){$("#pdf").href=B+GRP[$("#grp").value][1]}
